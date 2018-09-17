@@ -2,10 +2,13 @@
 title: API Reference
 
 language_tabs: # must be one of https://git.io/vQNgJ
-  - shell
-  - ruby
-  - python
-  - javascript
+  - XML
+  - Ruby
+  - Python
+  - PHP
+  - Java
+  - .NET
+
 
 toc_footers:
   - <a href='#'>Sign Up for a Developer Key</a>
@@ -19,221 +22,211 @@ search: true
 
 # Introduction
 
-Welcome to the Kittn API! You can use our API to access Kittn API endpoints, which can get information on various cats, kittens, and breeds in our database.
+The cnpAPI data format supports two types of transaction submission methods: Online and Batch. With the Online method, you submit each transaction independently and receive a response in real-time. Typically, merchants use the Online method for Authorization transactions, as well as transactions available only via Online (for example, Void). The Batch method enables you to submit multiple transactions simultaneously in a single Session file. Vantiv recommends the Batch method for all transaction submissions except Authorizations and the transaction available only via Online.
 
-We have language bindings in Shell, Ruby, Python, and JavaScript! You can view code examples in the dark area to the right, and you can switch the programming language of the examples with the tabs in the top right.
+While the cnpAPI is XML, we also examples in the various languages supported by our SDKs: Java, Python, .NET, PHP and Ruby.
 
-This example API documentation page was created with [Slate](https://github.com/lord/slate). Feel free to edit it and use it as a base for your own API's documentation.
+# Authorization Transactions
 
-# Authentication
+The Authorization transaction enables you to confirm that a customer submitted a valid payment method and has sufficient funds to purchase the goods or services they ordered. Including the Bill to Address information triggers an AVS check.
+
+##Authorization Elements
+
+Element | Required (Y, N, C) | Description
+--------- | ------- | -----------
+orderId| Y | A merchant-assigned value representing the order in the merchant’s system.
+amount| Y | The amount of the transaction.
+orderSource| Y | Defines the order entry source for the type of transaction. Possible values are: 3dsAuthenticated, 3dsAttempted, echeckppd, ecommerce, installment, mailorder, rrecurring, retail, telephone, recurringtel, applepay, and androidpay. 
+customerInfo | N |The parent of several child elements use to define customer information.
+billToAddress | N | Contains several child elements that define the postal mailing address (and telephone number) used for billing purposes. Worldpay recommends you include the address and zip for Address Verification purposes.
+shipToAddress | N | Contains several child elements that define the postal mailing address (and telephone number) used for shipping purposes. 
+card, token, paypal, paypage, applepay | Y | Defines the method of payment (card, paypal, or applepay), or use of a low or high value token.
+cardholderAuthentication | N | Contains child elements that define the authentication code and customer IP Address (Paypal transactions).
+pos | N | Contains child elements used to specify information required when submitting transactions from point of sale terminals.
+customBilling | N | Defines soft/custom billing descriptor information for the transaction.
+
 
 > To authorize, use this code:
 
 ```ruby
-require 'kittn'
+require 'LitleOnline'
+include LitleOnline
 
-api = Kittn::APIClient.authorize!('meowmeowmeow')
+#Authorization
+auth_info = {
+  'orderId' => '1',
+  'amount' => '10010',
+  'orderSource'=>'ecommerce',
+  'billToAddress'=>{
+  'name' => 'John Smith',
+  'addressLine1' => '1 Main St.',
+  'city' => 'Burlington',
+  'state' => 'MA',
+  'zip' => '01803-3747',
+  'country' => 'US'},
+  'card'=>{
+  'number' =>'4**************9',
+  'expDate' => '0112',
+  'cardValidationNum' => '349',
+  'type' => 'VI'}
+}
+auth_response = LitleOnlineRequest.new.authorization(auth_info)
+
+#display results
+puts "Response: " + auth_response.authorizationResponse.response
+puts "Message: " + auth_response.authorizationResponse.message
+puts "Litle Transaction ID: " + auth_response.authorizationResponse.litleTxnId
+
 ```
 
 ```python
-import kittn
+from litleSdkPython.litleOnlineRequest import *
 
-api = kittn.authorize('meowmeowmeow')
+config = Configuration()
+config.setUser("User")
+config.setPassword("Pass")
+config.setMerchantId("123")
+config.setUrl("Sandbox")
+config.setProxy("")
+
+#Authorization
+auth = litleXmlFields.authorization()
+auth.orderId = '1'
+auth.amount = 10010
+auth.orderSource = 'ecommerce'
+contact = litleXmlFields.contact();
+contact.name = "John Smith"
+contact.addressLine1 = "1 Main St."
+contact.city = "Burlington"
+contact.state = "MA"
+contact.zip = "01803-3747"
+contact.country = "USA"
+auth.billToAddress = contact
+card = litleXmlFields.cardType()
+card.number = "4457010000000009"
+card.expDate = "0121"
+card.cardValidationNum = "349"
+card.type = 'VI'
+auth.card = card
+
+litleXml = litleOnlineRequest(config)
+response = litleXml.sendRequest(auth)
+
+#display results
+print "Response: " + response.response
+print "Message: " + response.message
+print "LitleTransaction ID: " + str(response.litleTxnId)
 ```
 
-```shell
-# With shell, you can just pass the correct header with each request
-curl "api_endpoint_here"
-  -H "Authorization: meowmeowmeow"
+```xml
+<cnpOnlineRequest version="12.0" xmlns="http://www.vantivcnp.com/schema" merchantId="100">
+	<authentication>
+		<user>User Name</user>
+		<password>Password</password>
+	</authentication>
+	<authorization id="834262" reportGroup="ABC Division" customerId="038945">
+		<orderId>65347567</orderId>
+		<amount>40000</amount>
+		<orderSource>3dsAuthenticated</orderSource>
+		<billToAddress>
+			<name>John Smith</name>
+			<addressLine1>100 Main St</addressLine1>
+			<city>Boston</city>
+			<state>MA</state>
+			<zip>12345</zip>
+			<email>jsmith@someaddress.com</email>
+			<phone>555-123-4567</phone>
+		</billToAddress>
+		<card>
+			<type>VI</type>
+			<number>4000000000000002</number>
+			<expDate>1209</expDate>
+			<cardValidationNum>555</cardValidationNum>
+		</card>
+		<cardholderAuthentication>
+			<authenticationValue>BwABBJQ1gJDUCAAAAAAA=</authenticationValue>
+			<authenticationTransactionId>gMV75TmjAgk=		</authenticationTransactionId>
+		</cardholderAuthentication>
+	</authorization>
+</cnpOnlineRequest>
 ```
 
-```javascript
-const kittn = require('kittn');
+```java
 
-let api = kittn.authorize('meowmeowmeow');
-```
+import com.litle.sdk.generate.*;
 
-> Make sure to replace `meowmeowmeow` with your API key.
+//Authorization
+public class AuthExample {
+    public static void main(String[] args) {
+        Authorization auth = new Authorization();
+        auth.setOrderId("1");
+        auth.setAmount(10010L);
+        auth.setOrderSource(OrderSourceType.ECOMMERCE);
+        Contact billToAddress = new Contact();
+        billToAddress.setName("John Smith");
+        billToAddress.setAddressLine1("1 Main St.");
+        billToAddress.setCity("Burlington");
+        billToAddress.setState("MA");
+        billToAddress.setCountry(CountryTypeEnum.US);
+        billToAddress.setZip("01803-3747");
+        auth.setBillToAddress(billToAddress);
+        CardType card = new CardType();
+        card.setNumber("375001010000003");
+        card.setExpDate("0112");
+        card.setCardValidationNum("349");
+        card.setType(MethodOfPaymentTypeEnum.AX);
+        auth.setCard(card);
 
-Kittn uses API keys to allow access to the API. You can register a new Kittn API key at our [developer portal](http://example.com/developers).
-
-Kittn expects for the API key to be included in all API requests to the server in a header that looks like the following:
-
-`Authorization: meowmeowmeow`
-
-<aside class="notice">
-You must replace <code>meowmeowmeow</code> with your personal API key.
-</aside>
-
-# Kittens
-
-## Get All Kittens
-
-```ruby
-require 'kittn'
-
-api = Kittn::APIClient.authorize!('meowmeowmeow')
-api.kittens.get
-```
-
-```python
-import kittn
-
-api = kittn.authorize('meowmeowmeow')
-api.kittens.get()
-```
-
-```shell
-curl "http://example.com/api/kittens"
-  -H "Authorization: meowmeowmeow"
-```
-
-```javascript
-const kittn = require('kittn');
-
-let api = kittn.authorize('meowmeowmeow');
-let kittens = api.kittens.get();
-```
-
-> The above command returns JSON structured like this:
-
-```json
-[
-  {
-    "id": 1,
-    "name": "Fluffums",
-    "breed": "calico",
-    "fluffiness": 6,
-    "cuteness": 7
-  },
-  {
-    "id": 2,
-    "name": "Max",
-    "breed": "unknown",
-    "fluffiness": 5,
-    "cuteness": 10
-  }
-]
-```
-
-This endpoint retrieves all kittens.
-
-### HTTP Request
-
-`GET http://example.com/api/kittens`
-
-### Query Parameters
-
-Parameter | Default | Description
---------- | ------- | -----------
-include_cats | false | If set to true, the result will also include cats.
-available | true | If set to false, the result will include kittens that have already been adopted.
-
-<aside class="success">
-Remember â€” a happy kitten is an authenticated kitten!
-</aside>
-
-## Get a Specific Kitten
-
-```ruby
-require 'kittn'
-
-api = Kittn::APIClient.authorize!('meowmeowmeow')
-api.kittens.get(2)
-```
-
-```python
-import kittn
-
-api = kittn.authorize('meowmeowmeow')
-api.kittens.get(2)
-```
-
-```shell
-curl "http://example.com/api/kittens/2"
-  -H "Authorization: meowmeowmeow"
-```
-
-```javascript
-const kittn = require('kittn');
-
-let api = kittn.authorize('meowmeowmeow');
-let max = api.kittens.get(2);
-```
-
-> The above command returns JSON structured like this:
-
-```json
-{
-  "id": 2,
-  "name": "Max",
-  "breed": "unknown",
-  "fluffiness": 5,
-  "cuteness": 10
+        AuthorizationResponse response = new LitleOnline().authorize(auth);
+        //Display Results
+        System.out.println("Response: " + response.getResponse());
+        System.out.println("Message: " + response.getMessage());
+        System.out.println("Litle Transaction ID: " + response.getLitleTxnId());
+    }
 }
 ```
 
-This endpoint retrieves a specific kitten.
+```.NET
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using Litle.Sdk;
 
-<aside class="warning">Inside HTML code blocks like this one, you can't use Markdown, so use <code>&lt;code&gt;</code> blocks to denote code.</aside>
+    class Example
+    {
+        [STAThread]
+        public static void Main(String[] args)
+        {
+            LitleOnline litle = new LitleOnline();
+            authorization authorization = new authorization();
+            authorization.orderId = "1";
+            authorization.amount = 1495;
+            authorization.orderSource = orderSourceType.ecommerce;
+            contact contact = new contact();
+            contact.name = "John Smith";
+            contact.addressLine1 = "1 Main St.";
+            contact.city = "Burlington";
+            contact.state = "MA";
+            contact.zip = "01803-3747";
+            contact.country = countryTypeEnum.US;
+            authorization.billToAddress = contact;
+            cardType card = new cardType();
+            card.type = methodOfPaymentTypeEnum.VI;
+            card.number = "4457010000000009";
+            card.expDate = "0112";
+            card.cardValidationNum = "349";
+            authorization.card = card;
 
-### HTTP Request
+            authorizationResponse response = litle.Authorize(authorization);
 
-`GET http://example.com/kittens/<ID>`
-
-### URL Parameters
-
-Parameter | Description
---------- | -----------
-ID | The ID of the kitten to retrieve
-
-## Delete a Specific Kitten
-
-```ruby
-require 'kittn'
-
-api = Kittn::APIClient.authorize!('meowmeowmeow')
-api.kittens.delete(2)
-```
-
-```python
-import kittn
-
-api = kittn.authorize('meowmeowmeow')
-api.kittens.delete(2)
-```
-
-```shell
-curl "http://example.com/api/kittens/2"
-  -X DELETE
-  -H "Authorization: meowmeowmeow"
-```
-
-```javascript
-const kittn = require('kittn');
-
-let api = kittn.authorize('meowmeowmeow');
-let max = api.kittens.delete(2);
-```
-
-> The above command returns JSON structured like this:
-
-```json
-{
-  "id": 2,
-  "deleted" : ":("
+            //Display Results
+            Console.WriteLine("Response: " + response.response);
+            Console.WriteLine("Message: " + response.message);
+            Console.WriteLine("Litle Transaction Id: " + response.litleTxnId);
+            Console.ReadLine();
+        }
 }
 ```
 
-This endpoint deletes a specific kitten.
-
-### HTTP Request
-
-`DELETE http://example.com/kittens/<ID>`
-
-### URL Parameters
-
-Parameter | Description
---------- | -----------
-ID | The ID of the kitten to delete
 
